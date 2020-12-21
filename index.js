@@ -1,5 +1,5 @@
 const sharp = require("sharp");
-const got = require("got");
+const axios = require("axios");
 
 const Parse = require("parse/node");
 Parse.initialize(
@@ -19,36 +19,34 @@ exports.handler = (event) => {
       wallpapers.forEach((wallpaper, index) => {
         let phoneImage = wallpaper.get("phone");
         let thumbName = "thumb_" + phoneImage.name();
-        let sharpStream = sharp({
-          failOnError: false,
-        });
-        try {
-          got.stream(phoneImage.url()).pipe(sharpStream);
-          sharpStream
-            .clone()
-            .resize({ width: 273, height: 205 })
-            .toBuffer()
-            .then((res) => {
-              let base64String = `data:image/png;base64,${res.toString(
-                "base64"
-              )}`;
-              let thumb = new Parse.File(thumbName, { base64: base64String });
-              wallpaper.set("thumbnail", thumb);
-              wallpaper.save(null, { useMasterKey: true }).then(
-                (response) => {
-                  console.log("Updated Categories", response);
-                },
-                (error) => {
-                  console.error("Error while updating Categories", error);
-                }
-              );
-            })
-            .catch((err) => {
-              console.error("Error processing files, let's clean it up", err);
-            });
-        } catch (err) {
-          console.log(err);
-        }
+        axios
+          .get(phoneImage.url(), { responseType: "arraybuffer" })
+          .then((image) => {
+            sharp(image.data)
+              .resize({ width: 273, height: 205 })
+              .toBuffer()
+              .then((res) => {
+                let base64String = `data:image/png;base64,${res.toString(
+                  "base64"
+                )}`;
+                let thumb = new Parse.File(thumbName, { base64: base64String });
+                wallpaper.set("thumbnail", thumb);
+                wallpaper.save(null, { useMasterKey: true }).then(
+                  (response) => {
+                    console.log("Updated Categories", response);
+                  },
+                  (error) => {
+                    console.error("Error while updating Categories", error);
+                  }
+                );
+              })
+              .catch((err) => {
+                console.error("Error processing files, let's clean it up", err);
+              });
+          })
+          .catch((err) => {
+            console.log(err);
+          });
       });
     })
     .catch((err) => {
